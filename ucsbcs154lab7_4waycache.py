@@ -25,10 +25,10 @@ resp_data = pyrtl.Output(bitwidth=32, name='resp_data') # If read request, retur
 # Memories
 ### Memories of cache? use address indiceses to index into here and check valid and tag. 
 ### 01234 for ways. addr width of all is 4 bits, so its 2^4 = 16 for the 16 rows. i guess valid0123 = just value at these index?
-valid_0 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='valid_0')
-valid_1 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='valid_1')
-valid_2 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='valid_2')
-valid_3 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='valid_3')
+valid_0 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_0')
+valid_1 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_1')
+valid_2 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_2')
+valid_3 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_3')
 
 tag_0 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_0')
 tag_1 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_1')
@@ -107,19 +107,19 @@ with pyrtl.conditional_assignment:
 # Do read miss
 read_miss = req_new & ~req_type & ~resp_hit_temp
 # if miss, set whole block to 0, valid to 1, tag = addr tag. 
-valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), read_miss & (repl_way_temp == 0))
+valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (read_miss & (repl_way_temp == 0))| (req_new & ~resp_hit_temp & (repl_way_temp == 0)))
 tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 0))
 data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 0))
 
-valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), read_miss & (repl_way_temp == 1))
+valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (read_miss & (repl_way_temp == 1))| (req_new & ~resp_hit_temp & (repl_way_temp == 1)))
 tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 1))
 data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 1))
 
-valid_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), read_miss & (repl_way_temp == 2))
+valid_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (read_miss & (repl_way_temp == 2))| (req_new & ~resp_hit_temp & (repl_way_temp == 2)))
 tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 2))
 data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 2))
 
-valid_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), read_miss & (repl_way_temp == 3))
+valid_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (read_miss & (repl_way_temp == 3)) | (req_new & ~resp_hit_temp & (repl_way_temp == 3)))
 tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 3))
 data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 3))
 
@@ -156,12 +156,12 @@ zv2 = pyrtl.WireVector(bitwidth = 128, name = "zv2")
 zv3 = pyrtl.WireVector(bitwidth = 128, name = "zv3") """
 # miss and request, set valid to 1
 
-
+""" 
 valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 0))
 valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 1))
 valid_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 2))
 valid_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 3))
-
+ """
 tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 0))
 tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 1))
 tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 2))
