@@ -25,20 +25,20 @@ resp_data = pyrtl.Output(bitwidth=32, name='resp_data') # If read request, retur
 # Memories
 ### Memories of cache? use address indiceses to index into here and check valid and tag. 
 ### 01234 for ways. addr width of all is 4 bits, so its 2^4 = 16 for the 16 rows. i guess valid0123 = just value at these index?
-valid_0 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_0')
-valid_1 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_1')
-valid_2 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_2')
-valid_3 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_3')
+valid_0 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='valid_0')
+valid_1 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='valid_1')
+valid_2 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='valid_2')
+valid_3 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='valid_3')
 
-tag_0 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='tag_0')
-tag_1 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='tag_1')
-tag_2 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='tag_2')
-tag_3 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='tag_3')
+tag_0 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_0')
+tag_1 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_1')
+tag_2 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_2')
+tag_3 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_3')
 
-data_0 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='data_0')
-data_1 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='data_1')
-data_2 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='data_2')
-data_3 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='data_3')
+data_0 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='data_0')
+data_1 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='data_1')
+data_2 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='data_2')
+data_3 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='data_3')
 
 # To track which Way entry to replace next.
 repl_way = pyrtl.MemBlock(bitwidth=2, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='repl_way')
@@ -47,142 +47,131 @@ repl_way = pyrtl.MemBlock(bitwidth=2, addrwidth=4, max_read_ports=2, max_write_p
 addr_tag = pyrtl.WireVector(bitwidth=24, name = "addr_tag")
 addr_index = pyrtl.WireVector(bitwidth = 4, name = "addr_index")
 addr_offset = pyrtl.WireVector(bitwidth = 4, name = "addr_offset")
-
+word_offset = pyrtl.WireVector(bitwidth = 2, name = "word_offset")
 addr_tag <<= req_addr[8:32]
 addr_index <<= req_addr[4:8]
 addr_offset <<= req_addr[0:4]
+word_offset <<= pyrtl.shift_right_logical(addr_offset,2)
 
-hit_way = pyrtl.WireVector(bitwidth = 4, name = "hit_way")
 repl_way_temp = pyrtl.WireVector(bitwidth = 2, name = "repl_way_temp")
 resp_hit_temp = pyrtl.WireVector(bitwidth = 1, name = "resp_hit_temp")
-resp_data_temp = pyrtl.WireVector(bitwidth = 128, name = "resp_data_temp")
+resp_data_temp = pyrtl.WireVector(bitwidth = 32, name = "resp_data_temp")
 write_mask = pyrtl.WireVector(bitwidth = 128, name = "write_mask")
 write_data = pyrtl.WireVector(bitwidth = 128, name = "write_data")
 
+####################################################################################
+####################################################################################
 ####################################################################################
 
 # TODO: Check four entries in a row in parallel.
 # TODO: Determine if hit or miss.
 
-# hit_way = which way was hit (0 to 4)
-# hit_result_temp = 0 if hit, 1 if not hit 
+# 1 if hit, 0 if not hit
+hit_0 = (tag_0[addr_index] == addr_tag) & (valid_0[addr_index])
+hit_1 = (tag_1[addr_index] == addr_tag) & (valid_1[addr_index])
+hit_2 = (tag_2[addr_index] == addr_tag) & (valid_2[addr_index])
+hit_3 = (tag_3[addr_index] == addr_tag) & (valid_3[addr_index])
 
-with pyrtl.conditional_assignment:
-    with req_new: # if this is a read/write request
-        with (tag_0[addr_index] == addr_tag) & (valid_0[addr_index]):
-            resp_hit_temp |= pyrtl.Const(1)
-            hit_way |= pyrtl.Const(0)
-        with (tag_1[addr_index] == addr_tag) & (valid_1[addr_index]):
-            resp_hit_temp |= pyrtl.Const(1)
-            hit_way |= pyrtl.Const(1)
-        with (tag_2[addr_index] == addr_tag) & (valid_2[addr_index]):
-            resp_hit_temp |= pyrtl.Const(1)
-            hit_way |= pyrtl.Const(2)
-        with (tag_3[addr_index] == addr_tag) & (valid_3[addr_index]):
-            resp_hit_temp |= pyrtl.Const(1)
-            hit_way |= pyrtl.Const(3)
-        with pyrtl.otherwise:
-            resp_hit_temp |= pyrtl.Const(0)
-            hit_way |= pyrtl.Const(0)
+resp_hit_temp <<= hit_0 | hit_1 | hit_2 | hit_3 # if all miss, then its a miss
 
 resp_hit <<= resp_hit_temp
+####################################################################################
 
 ## Round robin init 
 repl_way_temp <<= repl_way[addr_index]
 
-# TODO: If request type is write, write req_data to appropriate block address
-enable_0 = pyrtl.WireVector(bitwidth = 1, name = "enable_0")
-enable_1 = pyrtl.WireVector(bitwidth = 1, name = "enable_1")
-enable_2 = pyrtl.WireVector(bitwidth = 1, name = "enable_2")
-enable_3 = pyrtl.WireVector(bitwidth = 1, name = "enable_3")
 
 
 
-# TODO: If request type is read, return read data at appropriate block address
-# bitshift the thing all the way left, then and with 0000001111. 
-with pyrtl.conditional_assignment:
-    with (req_new & ~req_type): # if this was a read request
-        with resp_hit_temp: # if it was a hit
-            # index into the class, read the appropriate thing.
-            with hit_way == 0:
-                resp_data_temp |= pyrtl.shift_left_logical(data_0[addr_index], 32 * addr_offset) & 0b1111
-            with hit_way == 1:
-                resp_data_temp |= pyrtl.shift_left_logical(data_1[addr_index], 32 * addr_offset) & 0b1111
-            with hit_way == 2:
-                resp_data_temp |= pyrtl.shift_left_logical(data_2[addr_index], 32 * addr_offset) & 0b1111
-            with hit_way == 3:
-                resp_data_temp |= pyrtl.shift_left_logical(data_3[addr_index], 32 * addr_offset) & 0b1111
-        with pyrtl.otherwise: # if it was a miss and READ. DOES THIS WORK OR DO SIMILR TO WRITE MISS
-            with repl_way_temp == 0:
-                valid_0[addr_index] |= pyrtl.Const(1)
-            with repl_way_temp == 1:
-                valid_1[addr_index] |= pyrtl.Const(1)
-            with repl_way_temp == 2:
-                valid_2[addr_index] |= pyrtl.Const(1)
-            with repl_way_temp == 3:
-                valid_3[addr_index] |= pyrtl.Const(1)
-    with (req_new & req_type): # if this was a write request       
-        with resp_hit_temp: # if this was WRITE HIT     
-            with hit_way == 0:
-                enable_0 |= pyrtl.Const(1)
-                enable_1 |= pyrtl.Const(0)
-                enable_2 |= pyrtl.Const(0)
-                enable_3 |= pyrtl.Const(0)
-            with hit_way == 1:
-                enable_0 |= pyrtl.Const(0)
-                enable_1 |= pyrtl.Const(1)
-                enable_2 |= pyrtl.Const(0)
-                enable_3 |= pyrtl.Const(0)
-            with hit_way == 2:
-                enable_0 |= pyrtl.Const(0)
-                enable_1 |= pyrtl.Const(0)
-                enable_2 |= pyrtl.Const(1)
-                enable_3 |= pyrtl.Const(0)
-            with hit_way == 3:
-                enable_0 |= pyrtl.Const(0)
-                enable_1 |= pyrtl.Const(0)
-                enable_2 |= pyrtl.Const(0)
-                enable_3 |= pyrtl.Const(1)
-        with pyrtl.otherwise: # if this was a WRITE MISS
-            with repl_way_temp == 0:
-                valid_0[addr_index] |= pyrtl.Const(1)
-            with repl_way_temp == 1:
-                valid_1[addr_index] |= pyrtl.Const(1)
-            with repl_way_temp == 2:
-                valid_2[addr_index] |= pyrtl.Const(1)
-            with repl_way_temp == 3:
-                valid_3[addr_index] |= pyrtl.Const(1)
-
-resp_data <<= resp_data_temp
-
-        # need to replace by round robin!
-        
-            #On a cache miss, our cache will not access a larger memory as would occur in a regular
-            # memory hierarchy. You may instead assume the new block's contents are "0". If you miss on
-            # req_addr, you should return “0” as your resp_data and output “0” as your resp_hit. The
-            # replaced data block should be set to “0” and valid for future accesses.
-       
-data_shift_amount = addr_offset * 32
-
-# if resp_hit_temp = 1 : WE HIT then write mask is 0000 1111 1111 0000 0000 (if offset was)
-write_mask <<= pyrtl.select(resp_hit_temp, ~pyrtl.shift_left_logical(pyrtl.Const(0x0ffffffff, bitwidth=128), data_shift_amount), 0)
-
-# TODO: This line is incomplete you will need to change it appropriately. 
-# IF MISSED AND REQ_TYPE is READ (0) and IS NEW REQUEST
-write_data <<= pyrtl.select(~resp_hit_temp & ~req_type & req_new, 0, pyrtl.shift_left_logical(req_data.zero_extended(bitwidth=128), data_shift_amount))
 data_0_payload = data_0[addr_index]
 data_1_payload = data_1[addr_index]
 data_2_payload = data_2[addr_index]
 data_3_payload = data_3[addr_index]
 
-data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_0_payload & write_mask) | write_data, enable_0) 
+
+
+
+# TODO: If request type is read, return read data at appropriate block address
+read_word_0 = pyrtl.shift_right_logical(data_0_payload, word_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
+read_word_1 = pyrtl.shift_right_logical(data_1_payload, word_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
+read_word_2 = pyrtl.shift_right_logical(data_2_payload, word_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
+read_word_3 = pyrtl.shift_right_logical(data_3_payload, word_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
+
+with pyrtl.conditional_assignment:
+    with req_new & ~req_type & resp_hit_temp:
+        resp_data_temp |= pyrtl.select(hit_0, read_word_0, pyrtl.select(hit_1, read_word_1, pyrtl.select(hit_2, read_word_2, pyrtl.select(hit_3,read_word_3, pyrtl.Const(0, bitwidth = 32)))))
+    with pyrtl.otherwise:
+        resp_data_temp |= pyrtl.Const(0, bitwidth = 32)
+
+# READ HIT DONE. 
+# Do read miss
+read_miss = req_new & ~req_type & ~resp_hit_temp
+# if miss, set whole block to 0, valid to 1, tag = addr tag. 
+valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), read_miss & (repl_way_temp == 0))
+tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 0))
+data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 0))
+
+valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), read_miss & (repl_way_temp == 1))
+tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 1))
+data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 1))
+
+valid_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), read_miss & (repl_way_temp == 2))
+tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 2))
+data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 2))
+
+valid_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), read_miss & (repl_way_temp == 3))
+tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 3))
+data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 3))
+
+# DONE READ MISS
+# TODO: DO WRITE HIT
+
+data_shift_amount = word_offset * 32
+
+# SELECT: WRITE HIT? MASK IS THING THE 11100001111 MASK : MASK IS ALL 0
+write_mask <<= pyrtl.select(req_new & req_type & resp_hit_temp, (~pyrtl.shift_left_logical(pyrtl.Const(0x0ffffffff, bitwidth=128), data_shift_amount)), 0)
+
+# TODO: This line is incomplete you will need to change it appropriately. 
+# SELECT: WRITE? WRITE DATA = 0: WRITE DATA = 
+write_data <<= pyrtl.select((req_new & req_type), pyrtl.shift_left_logical(req_data.zero_extended(bitwidth=128), data_shift_amount), 0)
+
+
+enable_0 = (req_new & req_type & hit_0) | (req_new & req_type & ~resp_hit_temp & (repl_way_temp == 0))
+enable_1 = (req_new & req_type & hit_1) | (req_new & req_type & ~resp_hit_temp & (repl_way_temp == 1))
+enable_2 = (req_new & req_type & hit_2) | (req_new & req_type & ~resp_hit_temp & (repl_way_temp == 2))
+enable_3 = (req_new & req_type & hit_3) | (req_new & req_type & ~resp_hit_temp & (repl_way_temp == 3))
+
+data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_0_payload & write_mask) | write_data, enable_0)
 data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_1_payload & write_mask) | write_data, enable_1)
 data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_2_payload & write_mask) | write_data, enable_2)
 data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_3_payload & write_mask) | write_data, enable_3)
 
+# TODO: If request type is write, write req_data to appropriate block address
+
+
+
+""" zv0 = pyrtl.WireVector(bitwidth = 128, name = "zv0")
+zv1 = pyrtl.WireVector(bitwidth = 128, name = "zv1")
+zv2 = pyrtl.WireVector(bitwidth = 128, name = "zv2")
+zv3 = pyrtl.WireVector(bitwidth = 128, name = "zv3") """
+# miss and request, set valid to 1
+
+
+valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 0))
+valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 1))
+valid_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 2))
+valid_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 3))
+
+tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 0))
+tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 1))
+tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 2))
+tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 3))
+resp_data <<= resp_data_temp
+
 repl_way_at_index = pyrtl.WireVector(bitwidth = 2, name = "repl_way_at_index")
+# update round robin
 with pyrtl.conditional_assignment:
-    with (req_new & ~resp_hit_temp): # if mem request and was a MISS
+    with (req_new & ~resp_hit_temp):
         with repl_way_temp == 3:
             repl_way_at_index |= 0
         with pyrtl.otherwise:
@@ -275,10 +264,10 @@ def TestCorrectIndex(simulation, trace, addr = 32):
         'req_type': 0,
         'req_data': 0,
     })
-
+    # read miss 
     assert(trace.trace["resp_hit"][-1] == 0)
     assert(trace.trace["resp_data"][-1] == 0) 
-
+    
     bin_addr = bin(addr)[2:]
     missing_bits = 32 - len(bin_addr)
     if missing_bits > 0:
@@ -292,6 +281,7 @@ def TestCorrectIndex(simulation, trace, addr = 32):
     tag_2_val = simulation.inspect_mem(tag_2).get(cache_index)
     tag_3_val = simulation.inspect_mem(tag_3).get(cache_index)
 
+    sim_trace.render_trace(symbol_len=8)
     assert((tag_0_val == addr_tag) or (tag_1_val == addr_tag) or (tag_2_val == addr_tag) or (tag_3_val == addr_tag))
 
     # Ensure that we hit in the next cycle.
@@ -310,11 +300,13 @@ def TestCorrectIndex(simulation, trace, addr = 32):
 sim_trace = pyrtl.SimulationTrace()
 sim = pyrtl.Simulation(tracer=sim_trace)
 
+
 TestNoRequest(sim, sim_trace)
 TestMiss(sim, sim_trace)
 TestHit(sim, sim_trace)
+
 TestWrite(sim, sim_trace)
 TestCorrectIndex(sim, sim_trace)
 
 # Print trace
-# sim_trace.render_trace(symbol_len=8)
+sim_trace.render_trace(symbol_len=8)
