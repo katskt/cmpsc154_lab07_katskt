@@ -30,15 +30,15 @@ valid_1 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_po
 valid_2 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_2')
 valid_3 = pyrtl.MemBlock(bitwidth=1, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='valid_3')
 
-tag_0 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_0')
-tag_1 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_1')
-tag_2 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_2')
-tag_3 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='tag_3')
+tag_0 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='tag_0')
+tag_1 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='tag_1')
+tag_2 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='tag_2')
+tag_3 = pyrtl.MemBlock(bitwidth=24, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='tag_3')
 
-data_0 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='data_0')
-data_1 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='data_1')
-data_2 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='data_2')
-data_3 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=2, asynchronous=True, name='data_3')
+data_0 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='data_0')
+data_1 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='data_1')
+data_2 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='data_2')
+data_3 = pyrtl.MemBlock(bitwidth=128, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='data_3')
 
 # To track which Way entry to replace next.
 repl_way = pyrtl.MemBlock(bitwidth=2, addrwidth=4, max_read_ports=2, max_write_ports=1, asynchronous=True, name='repl_way')
@@ -88,7 +88,10 @@ data_1_payload = data_1[addr_index]
 data_2_payload = data_2[addr_index]
 data_3_payload = data_3[addr_index]
 
-
+data_0_temp = pyrtl.WireVector(bitwidth = 128, name = "data_0_temp")
+data_1_temp = pyrtl.WireVector(bitwidth = 128, name = "data_1_temp")
+data_2_temp = pyrtl.WireVector(bitwidth = 128, name = "data_2_temp")
+data_3_temp = pyrtl.WireVector(bitwidth = 128, name = "data_3_temp")
 
 
 # TODO: If request type is read, return read data at appropriate block address
@@ -105,24 +108,28 @@ with pyrtl.conditional_assignment:
 
 # READ HIT DONE. 
 # Do read miss
+""" 
+tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 0))
+tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 1))
+tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 2))
+tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 3))
+ """
 read_miss = req_new & ~req_type & ~resp_hit_temp
 # if miss, set whole block to 0, valid to 1, tag = addr tag. 
 valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (read_miss & (repl_way_temp == 0))| (req_new & ~resp_hit_temp & (repl_way_temp == 0)))
-tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 0))
-data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 0))
+tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (read_miss & (repl_way_temp == 0))| (req_new & ~resp_hit_temp & (repl_way_temp == 0)))
+data_0_temp <<= pyrtl.select(read_miss & (repl_way_temp == 0), pyrtl.Const(0, bitwidth = 128), (data_0_payload & write_mask) | write_data )
 
 valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (read_miss & (repl_way_temp == 1))| (req_new & ~resp_hit_temp & (repl_way_temp == 1)))
-tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 1))
-data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 1))
+tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (read_miss & (repl_way_temp == 1))| (req_new & ~resp_hit_temp & (repl_way_temp == 1)))
+data_1_temp <<= pyrtl.select(read_miss & (repl_way_temp == 1), pyrtl.Const(0, bitwidth = 128), (data_1_payload & write_mask) | write_data )
 
 valid_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (read_miss & (repl_way_temp == 2))| (req_new & ~resp_hit_temp & (repl_way_temp == 2)))
-tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 2))
-data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 2))
-
+tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (read_miss & (repl_way_temp == 2))|(req_new & ~resp_hit_temp & (repl_way_temp == 2)))
+data_2_temp <<= pyrtl.select(read_miss & (repl_way_temp == 2), pyrtl.Const(0, bitwidth = 128), (data_2_payload & write_mask) | write_data )
 valid_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (read_miss & (repl_way_temp == 3)) | (req_new & ~resp_hit_temp & (repl_way_temp == 3)))
-tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, read_miss & (repl_way_temp == 3))
-data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(0, bitwidth = 128), read_miss & (repl_way_temp == 3))
-
+tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (read_miss & (repl_way_temp == 3))|(req_new & ~resp_hit_temp & (repl_way_temp == 3)))
+data_3_temp <<= pyrtl.select(read_miss & (repl_way_temp == 3), pyrtl.Const(0, bitwidth = 128), (data_3_payload & write_mask) | write_data )
 # DONE READ MISS
 # TODO: DO WRITE HIT
 
@@ -141,10 +148,10 @@ enable_1 = (req_new & req_type & hit_1) | (req_new & req_type & ~resp_hit_temp &
 enable_2 = (req_new & req_type & hit_2) | (req_new & req_type & ~resp_hit_temp & (repl_way_temp == 2))
 enable_3 = (req_new & req_type & hit_3) | (req_new & req_type & ~resp_hit_temp & (repl_way_temp == 3))
 
-data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_0_payload & write_mask) | write_data, enable_0)
-data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_1_payload & write_mask) | write_data, enable_1)
-data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_2_payload & write_mask) | write_data, enable_2)
-data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_3_payload & write_mask) | write_data, enable_3)
+data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_0_temp| write_data, enable_0 | read_miss & (repl_way_temp == 0))
+data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_1_temp| write_data, enable_1 | read_miss & (repl_way_temp == 1))
+data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_2_temp| write_data, enable_2 | read_miss & (repl_way_temp == 2))
+data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_3_temp| write_data, enable_3 | read_miss & (repl_way_temp == 3))
 
 # TODO: If request type is write, write req_data to appropriate block address
 
@@ -162,10 +169,7 @@ valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp 
 valid_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 2))
 valid_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 3))
  """
-tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 0))
-tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 1))
-tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 2))
-tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 3))
+
 resp_data <<= resp_data_temp
 
 repl_way_at_index = pyrtl.WireVector(bitwidth = 2, name = "repl_way_at_index")
