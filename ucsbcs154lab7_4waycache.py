@@ -100,11 +100,11 @@ data_0_payload = data_0[addr_index]
 data_1_payload = data_1[addr_index]
 data_2_payload = data_2[addr_index]
 data_3_payload = data_3[addr_index]
-
+""" 
 data_0_temp = pyrtl.WireVector(bitwidth = 128, name = "data_0_temp")
 data_1_temp = pyrtl.WireVector(bitwidth = 128, name = "data_1_temp")
 data_2_temp = pyrtl.WireVector(bitwidth = 128, name = "data_2_temp")
-data_3_temp = pyrtl.WireVector(bitwidth = 128, name = "data_3_temp")
+data_3_temp = pyrtl.WireVector(bitwidth = 128, name = "data_3_temp") """
 
 
 # TODO: If request type is read, return read data at appropriate block address
@@ -150,30 +150,20 @@ write_hit = req_new & req_type & resp_hit_temp
 
 data_shift_amount = addr_offset * 32
 
+""" Issue 3: write_mask when write miss
+On a write miss, you want the block to contain req_data at the right word, and zeros elsewhere. Your write_mask is:
+pythonwrite_mask <<= pyrtl.select(write_hit, ~shift(...), 0)
+On a write miss, write_hit is 0, so write_mask becomes 0. But in data_0_temp for write miss, you only use write_data directly (not & write_mask), so that case is actually fine. Does write_data alone give you what you want for a write miss? Think through what write_data contains.
+Fix issue 1 and 2 first — those are the blockers!
+"""
 
-# SELECT: WRITE HIT? MASK IS THING THE 11100001111 MASK : MASK IS ALL 0
-# 
 write_mask <<= pyrtl.select(write_hit, (~pyrtl.shift_left_logical(pyrtl.Const(0x0ffffffff, bitwidth=128), data_shift_amount)),0)
 # TODO: LOOK OVER THIS AREA!!!
 # SELECT: WRITE? WRITE DATA = 0: WRITE DATA = 
-write_data <<= pyrtl.select((req_new & req_type), pyrtl.shift_left_logical(req_data.zero_extended(bitwidth=128), data_shift_amount), 0)
+write_data <<= pyrtl.select(read_miss, 0, pyrtl.shift_left_logical(req_data.zero_extended(bitwidth=128), data_shift_amount))
 
 # if read miss, set block to 0. if write miss, set block except the new word to 0. if write HIT, then only change the filling. 
 # if miss and repl way, set temp to be 0. else set temp to be new data
-data_0_temp <<= pyrtl.select(read_miss & (repl_way_temp == 0), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
-                             pyrtl.select(write_miss & (repl_way_temp == 0),  write_data, # if write miss, make all 0 but write data
-                                          pyrtl.select(write_hit & hit_0, (data_0_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_1_temp <<= pyrtl.select(read_miss & (repl_way_temp == 1), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
-                             pyrtl.select(write_miss & (repl_way_temp == 1),  write_data, # if write miss, make all 0 but write data
-                                          pyrtl.select(write_hit & hit_1, (data_1_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_2_temp <<= pyrtl.select(read_miss & (repl_way_temp == 2), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
-                             pyrtl.select(write_miss & (repl_way_temp == 2),  write_data, # if write miss, make all 0 but write data
-                                          pyrtl.select(write_hit & hit_2, (data_2_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_3_temp <<= pyrtl.select(read_miss & (repl_way_temp == 3), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
-                             pyrtl.select(write_miss & (repl_way_temp == 3),  write_data, # if write miss, make all 0 but write data
-                                          pyrtl.select(write_hit & hit_3, (data_3_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-                                        
-
 
 
 # enabled to write if hit write on correct way OR ANY miss but next in round robin. 
@@ -182,10 +172,10 @@ enable_1 = ((read_miss | write_miss) & repl_way_temp == 1) | (write_hit & hit_1)
 enable_2 = ((read_miss | write_miss) & repl_way_temp == 2) | (write_hit & hit_2)
 enable_3 = ((read_miss | write_miss) & repl_way_temp == 3) | (write_hit & hit_3)
 
-data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_0_temp, enable_0)
-data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_1_temp, enable_1)
-data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_2_temp, enable_2)
-data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_3_temp, enable_3)
+data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_0_payload & write_mask) | write_data, enable_0)
+data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_1_payload & write_mask) | write_data, enable_1)
+data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_2_payload & write_mask) | write_data, enable_2)
+data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_3_payload & write_mask) | write_data, enable_3)
 
 # TODO: If request type is write, write req_data to appropriate block address
 
