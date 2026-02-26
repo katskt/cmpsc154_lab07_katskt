@@ -179,10 +179,10 @@ enable_1 = (req_new & req_type) & (hit_1 | (~resp_hit_temp & (repl_way_temp == 1
 enable_2 = (req_new & req_type) & (hit_2 | (~resp_hit_temp & (repl_way_temp == 2)))
 enable_3 = (req_new & req_type) & (hit_3 | (~resp_hit_temp & (repl_way_temp == 3)))
 
-data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_0_temp| write_data, enable_0)
-data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_1_temp| write_data, enable_1)
-data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_2_temp| write_data, enable_2)
-data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_3_temp| write_data, enable_3)
+data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_0_temp, enable_0)
+data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_1_temp, enable_1)
+data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_2_temp, enable_2)
+data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(data_3_temp, enable_3)
 
 # TODO: If request type is write, write req_data to appropriate block address
 
@@ -302,7 +302,6 @@ def TestCorrectIndex(simulation, trace, addr = 32):
     tag_2_val = simulation.inspect_mem(tag_2).get(cache_index)
     tag_3_val = simulation.inspect_mem(tag_3).get(cache_index)
 
-    sim_trace.render_trace(symbol_len=8)
     assert((tag_0_val == addr_tag) or (tag_1_val == addr_tag) or (tag_2_val == addr_tag) or (tag_3_val == addr_tag))
 
     # Ensure that we hit in the next cycle.
@@ -330,4 +329,4 @@ TestWrite(sim, sim_trace)
 TestCorrectIndex(sim, sim_trace)
 
 # Print trace
-sim_trace.render_trace(symbol_len=8)
+# sim_trace.render_trace(symbol_len=8)
