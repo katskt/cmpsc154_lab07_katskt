@@ -86,7 +86,7 @@ with pyrtl.conditional_assignment:
         with pyrtl.otherwise:
             repl_way_at_index |= repl_way_temp + pyrtl.Const(1)
 
-repl_way[addr_index] <<= pyrtl.MemBlock.EnabledWrite(repl_way_at_index, req_type & resp_hit_temp)
+repl_way[addr_index] <<= pyrtl.MemBlock.EnabledWrite(repl_way_at_index, any_miss)
 # TODO: Handle replacement. Be careful handling replacement when you
 # also have to do a write
 ####################################################################################
@@ -146,18 +146,18 @@ write_hit = req_new & req_type & resp_hit_temp
 
 # if read miss, set block to 0. if write miss, set block except the new word to 0. if write HIT, then only change the filling. 
 # if miss and repl way, set temp to be 0. else set temp to be new data
-data_0_temp <<= pyrtl.select(read_miss & hit_0, pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
+data_0_temp <<= pyrtl.select(read_miss & (repl_way_temp == 0), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
                              pyrtl.select(write_miss & (repl_way_temp == 0),  write_data, # if write miss, make all 0 but write data
-                                          pyrtl.select(write_hit & repl_way_temp == 0, (data_0_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_1_temp <<= pyrtl.select(read_miss & hit_1, pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
+                                          pyrtl.select(write_hit & hit_0, (data_0_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
+data_1_temp <<= pyrtl.select(read_miss & (repl_way_temp == 1), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
                              pyrtl.select(write_miss & (repl_way_temp == 1),  write_data, # if write miss, make all 0 but write data
-                                          pyrtl.select(write_hit & repl_way_temp == 1, (data_1_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_2_temp <<= pyrtl.select(read_miss & hit_2, pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
+                                          pyrtl.select(write_hit & hit_1, (data_1_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
+data_2_temp <<= pyrtl.select(read_miss & (repl_way_temp == 2), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
                              pyrtl.select(write_miss & (repl_way_temp == 2),  write_data, # if write miss, make all 0 but write data
-                                          pyrtl.select(write_hit & repl_way_temp == 2, (data_2_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_3_temp <<= pyrtl.select(read_miss & hit_3, pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
+                                          pyrtl.select(write_hit & hit_2 (data_2_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
+data_3_temp <<= pyrtl.select(read_miss & (repl_way_temp == 3), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
                              pyrtl.select(write_miss & (repl_way_temp == 3),  write_data, # if write miss, make all 0 but write data
-                                          pyrtl.select(write_hit & repl_way_temp == 3, (data_3_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
+                                          pyrtl.select(write_hit & hit_3, (data_3_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
                                         
 
 data_shift_amount = addr_offset * 32
