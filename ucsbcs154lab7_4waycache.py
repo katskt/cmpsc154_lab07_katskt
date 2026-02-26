@@ -65,10 +65,10 @@ write_data = pyrtl.WireVector(bitwidth = 128, name = "write_data")
 # TODO: Determine if hit or miss.
 
 # 1 if hit, 0 if not hit
-hit_0 = (tag_0[addr_index] == addr_tag) & (valid_0[addr_index])
-hit_1 = (tag_1[addr_index] == addr_tag) & (valid_1[addr_index])
-hit_2 = (tag_2[addr_index] == addr_tag) & (valid_2[addr_index])
-hit_3 = (tag_3[addr_index] == addr_tag) & (valid_3[addr_index])
+hit_0 = req_new & (tag_0[addr_index] == addr_tag) & (valid_0[addr_index])
+hit_1 = req_new & (tag_1[addr_index] == addr_tag) & (valid_1[addr_index])
+hit_2 = req_new & (tag_2[addr_index] == addr_tag) & (valid_2[addr_index])
+hit_3 = req_new & (tag_3[addr_index] == addr_tag) & (valid_3[addr_index])
 
 resp_hit_temp <<= hit_0 | hit_1 | hit_2 | hit_3 # if all miss, then its a miss
 
@@ -94,17 +94,11 @@ repl_way[addr_index] <<= pyrtl.MemBlock.EnabledWrite(repl_way_at_index, any_miss
 # also have to do a write
 ####################################################################################
 
-
 # payload = block data
 data_0_payload = data_0[addr_index]
 data_1_payload = data_1[addr_index]
 data_2_payload = data_2[addr_index]
 data_3_payload = data_3[addr_index]
-""" 
-data_0_temp = pyrtl.WireVector(bitwidth = 128, name = "data_0_temp")
-data_1_temp = pyrtl.WireVector(bitwidth = 128, name = "data_1_temp")
-data_2_temp = pyrtl.WireVector(bitwidth = 128, name = "data_2_temp")
-data_3_temp = pyrtl.WireVector(bitwidth = 128, name = "data_3_temp") """
 
 
 # TODO: If request type is read, return read data at appropriate block address
@@ -123,12 +117,7 @@ with pyrtl.conditional_assignment:
 
 # READ HIT DONE. 
 # Do read miss
-""" 
-tag_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 0))
-tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 1))
-tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 2))
-tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 3))
- """
+
 # if miss, set whole block to 0, valid to 1, tag = addr tag. 
 valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (any_miss & (repl_way_temp == 0)))
 valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (any_miss & (repl_way_temp == 1)))
@@ -141,7 +130,7 @@ tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (any_miss & (repl_wa
 tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (any_miss & (repl_way_temp == 2)))
 tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (any_miss & (repl_way_temp == 3)))
 # DONE READ MISS
-# TODO: DO WRITE HIT
+
 read_hit = req_new & ~req_type & resp_hit_temp
 read_miss = req_new & ~req_type & ~resp_hit_temp
 write_miss = req_new & req_type & ~resp_hit_temp
@@ -150,12 +139,6 @@ write_hit = req_new & req_type & resp_hit_temp
 
 data_shift_amount = addr_offset * 32
 
-""" Issue 3: write_mask when write miss
-On a write miss, you want the block to contain req_data at the right word, and zeros elsewhere. Your write_mask is:
-pythonwrite_mask <<= pyrtl.select(write_hit, ~shift(...), 0)
-On a write miss, write_hit is 0, so write_mask becomes 0. But in data_0_temp for write miss, you only use write_data directly (not & write_mask), so that case is actually fine. Does write_data alone give you what you want for a write miss? Think through what write_data contains.
-Fix issue 1 and 2 first — those are the blockers!
-"""
 
 write_mask <<= pyrtl.select(write_hit, (~pyrtl.shift_left_logical(pyrtl.Const(0x0ffffffff, bitwidth=128), data_shift_amount)),0)
 # TODO: LOOK OVER THIS AREA!!!
@@ -177,20 +160,7 @@ data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_1_payload & write_mask)
 data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_2_payload & write_mask) | write_data, enable_2)
 data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_3_payload & write_mask) | write_data, enable_3)
 
-# TODO: If request type is write, write req_data to appropriate block address
 
-""" zv0 = pyrtl.WireVector(bitwidth = 128, name = "zv0")
-zv1 = pyrtl.WireVector(bitwidth = 128, name = "zv1")
-zv2 = pyrtl.WireVector(bitwidth = 128, name = "zv2")
-zv3 = pyrtl.WireVector(bitwidth = 128, name = "zv3") """
-# miss and request, set valid to 1
-
-""" 
-valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 0))
-valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 1))
-valid_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 2))
-valid_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(1, req_new & ~resp_hit_temp & (repl_way_temp == 3))
- """
 
 resp_data <<= resp_data_temp
 
