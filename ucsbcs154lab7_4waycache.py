@@ -52,6 +52,7 @@ addr_index <<= req_addr[4:8]
 addr_offset <<= req_addr[2:4]
 
 repl_way_temp = pyrtl.WireVector(bitwidth = 2, name = "repl_way_temp")
+repl_way_temp_new = pyrtl.WireVector(bitwidth = 2, name = "repl_way_temp_new")
 resp_hit_temp = pyrtl.WireVector(bitwidth = 1, name = "resp_hit_temp")
 resp_data_temp = pyrtl.WireVector(bitwidth = 32, name = "resp_data_temp")
 write_mask = pyrtl.WireVector(bitwidth = 128, name = "write_mask")
@@ -72,7 +73,6 @@ resp_hit_temp <<= hit_0 | hit_1 | hit_2 | hit_3 # if all miss, then its a miss
 resp_hit <<= resp_hit_temp
 
 
-read_hit = req_new & ~req_type & resp_hit_temp
 read_miss = req_new & ~req_type & ~resp_hit_temp
 write_miss = req_new & req_type & ~resp_hit_temp
 write_hit = req_new & req_type & resp_hit_temp
@@ -81,17 +81,16 @@ write_hit = req_new & req_type & resp_hit_temp
 
 ## Round robin init 
 repl_way_temp <<= repl_way[addr_index]
-repl_way_at_index = pyrtl.WireVector(bitwidth = 2, name = "repl_way_at_index")
 # update round robin
 with pyrtl.conditional_assignment:
     with (req_new & ~resp_hit_temp):
         with repl_way_temp == 3:
-            repl_way_at_index |= pyrtl.Const(0)
+            repl_way_temp_new |= pyrtl.Const(0)
         with pyrtl.otherwise:
-            repl_way_at_index |= repl_way_temp + pyrtl.Const(1)
+            repl_way_temp_new |= repl_way_temp + pyrtl.Const(1)
 
 any_miss = req_new & ~resp_hit_temp
-repl_way[addr_index] <<= pyrtl.MemBlock.EnabledWrite(repl_way_at_index, any_miss)
+repl_way[addr_index] <<= pyrtl.MemBlock.EnabledWrite(repl_way_temp_new, any_miss)
 ####################################################################################
 
 # payload = block data
@@ -113,6 +112,8 @@ with pyrtl.conditional_assignment:
         resp_data_temp |= pyrtl.select(hit_0, read_word_0, pyrtl.select(hit_1, read_word_1, pyrtl.select(hit_2, read_word_2, pyrtl.select(hit_3,read_word_3, pyrtl.Const(0, bitwidth = 32)))))
     with pyrtl.otherwise:
         resp_data_temp |= pyrtl.Const(0, bitwidth = 32)
+
+resp_data <<= resp_data_temp
 
 # TAG AND VALID CHANGE TO 1 IF MISS
 valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (any_miss & (repl_way_temp == 0)))
@@ -150,8 +151,6 @@ data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_2_payload & write_mask)
 data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_3_payload & write_mask) | write_data, enable_3)
 
 
-
-resp_data <<= resp_data_temp
 
 
 # TODO: Determine output
