@@ -74,7 +74,6 @@ resp_hit <<= resp_hit_temp
 
 
 read_miss = req_new & ~req_type & ~resp_hit_temp
-write_miss = req_new & req_type & ~resp_hit_temp
 write_hit = req_new & req_type & resp_hit_temp
 
 ####################################################################################
@@ -131,19 +130,20 @@ tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (any_miss & (repl_wa
 
 data_shift_amount = addr_offset * 32
 
-
+"""             Write Mask      Write Data      Actual Thingy
+Read miss:      000000000       0000000000      000000000000
+Write Hit:      110000011       00XXXXX00       YYXXXXXXXYYY
+Write Miss:     000000000       00XXXXX00       00DATATAT000
+"""
 write_mask <<= pyrtl.select(write_hit, (~pyrtl.shift_left_logical(pyrtl.Const(0x0ffffffff, bitwidth=128), data_shift_amount)),0)
 write_data <<= pyrtl.select(read_miss, 0, pyrtl.shift_left_logical(req_data.zero_extended(bitwidth=128), data_shift_amount))
 
-# if read miss, set block to 0. if write miss, set block except the new word to 0. if write HIT, then only change the filling. 
-# if miss and repl way, set temp to be 0. else set temp to be new data
-
 
 # enabled to write if hit write on correct way OR ANY miss but next in round robin. 
-enable_0 = ((read_miss | write_miss) & (repl_way_temp == 0)) | (write_hit & hit_0)
-enable_1 = ((read_miss | write_miss) & (repl_way_temp == 1)) | (write_hit & hit_1)
-enable_2 = ((read_miss | write_miss) & (repl_way_temp == 2)) | (write_hit & hit_2)
-enable_3 = ((read_miss | write_miss) & (repl_way_temp == 3)) | (write_hit & hit_3)
+enable_0 = ((any_miss) & (repl_way_temp == 0)) | (write_hit & hit_0)
+enable_1 = ((any_miss) & (repl_way_temp == 1)) | (write_hit & hit_1)
+enable_2 = ((any_miss) & (repl_way_temp == 2)) | (write_hit & hit_2)
+enable_3 = ((any_miss) & (repl_way_temp == 3)) | (write_hit & hit_3)
 
 data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_0_payload & write_mask) | write_data, enable_0)
 data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_1_payload & write_mask) | write_data, enable_1)
