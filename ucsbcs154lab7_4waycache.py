@@ -167,10 +167,10 @@ write_data <<= pyrtl.select(read_miss, 0, pyrtl.shift_left_logical(req_data.zero
 
 
 # enabled to write if hit write on correct way OR ANY miss but next in round robin. 
-enable_0 = ((read_miss | write_miss) & repl_way_temp == 0) | (write_hit & hit_0)
-enable_1 = ((read_miss | write_miss) & repl_way_temp == 1) | (write_hit & hit_1)
-enable_2 = ((read_miss | write_miss) & repl_way_temp == 2) | (write_hit & hit_2)
-enable_3 = ((read_miss | write_miss) & repl_way_temp == 3) | (write_hit & hit_3)
+enable_0 = ((read_miss | write_miss) & (repl_way_temp == 0)) | (write_hit & hit_0)
+enable_1 = ((read_miss | write_miss) & (repl_way_temp == 1)) | (write_hit & hit_1)
+enable_2 = ((read_miss | write_miss) & (repl_way_temp == 2)) | (write_hit & hit_2)
+enable_3 = ((read_miss | write_miss) & (repl_way_temp == 3)) | (write_hit & hit_3)
 
 data_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_0_payload & write_mask) | write_data, enable_0)
 data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_1_payload & write_mask) | write_data, enable_1)
