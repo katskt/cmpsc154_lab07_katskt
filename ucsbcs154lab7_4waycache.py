@@ -46,12 +46,10 @@ repl_way = pyrtl.MemBlock(bitwidth=2, addrwidth=4, max_read_ports=2, max_write_p
 # TODO: Declare your own WireVector, MemBlocks, etc.
 addr_tag = pyrtl.WireVector(bitwidth=24, name = "addr_tag")
 addr_index = pyrtl.WireVector(bitwidth = 4, name = "addr_index")
-addr_offset = pyrtl.WireVector(bitwidth = 4, name = "addr_offset")
-word_offset = pyrtl.WireVector(bitwidth = 2, name = "word_offset")
+addr_offset = pyrtl.WireVector(bitwidth = 2, name = "addr_offset")
 addr_tag <<= req_addr[8:32]
 addr_index <<= req_addr[4:8]
-addr_offset <<= req_addr[0:4]
-word_offset <<= pyrtl.shift_right_logical(addr_offset,2)
+addr_offset <<= req_addr[2:4]
 
 repl_way_temp = pyrtl.WireVector(bitwidth = 2, name = "repl_way_temp")
 resp_hit_temp = pyrtl.WireVector(bitwidth = 1, name = "resp_hit_temp")
@@ -84,11 +82,11 @@ repl_way_at_index = pyrtl.WireVector(bitwidth = 2, name = "repl_way_at_index")
 with pyrtl.conditional_assignment:
     with (req_new & ~resp_hit_temp):
         with repl_way_temp == 3:
-            repl_way_at_index |= 0
+            repl_way_at_index |= pyrtl.Const(0)
         with pyrtl.otherwise:
-            repl_way_at_index |= repl_way_temp + 1
+            repl_way_at_index |= repl_way_temp + pyrtl.Const(1)
 
-repl_way[addr_index] <<= repl_way_at_index
+repl_way[addr_index] <<= pyrtl.MemBlock.EnabledWrite(repl_way_at_index, req_type & resp_hit_temp)
 # TODO: Handle replacement. Be careful handling replacement when you
 # also have to do a write
 ####################################################################################
@@ -108,10 +106,10 @@ data_3_temp = pyrtl.WireVector(bitwidth = 128, name = "data_3_temp")
 
 # TODO: If request type is read, return read data at appropriate block address
 # if read hit, return read_word
-read_word_0 = pyrtl.shift_right_logical(data_0_payload, word_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
-read_word_1 = pyrtl.shift_right_logical(data_1_payload, word_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
-read_word_2 = pyrtl.shift_right_logical(data_2_payload, word_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
-read_word_3 = pyrtl.shift_right_logical(data_3_payload, word_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
+read_word_0 = pyrtl.shift_right_logical(data_0_payload, addr_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
+read_word_1 = pyrtl.shift_right_logical(data_1_payload, addr_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
+read_word_2 = pyrtl.shift_right_logical(data_2_payload, addr_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
+read_word_3 = pyrtl.shift_right_logical(data_3_payload, addr_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
 
 with pyrtl.conditional_assignment:
     with req_new & ~req_type & resp_hit_temp:
@@ -127,7 +125,7 @@ tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_
 tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 2))
 tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, req_new & ~resp_hit_temp & (repl_way_temp == 3))
  """
-any_miss = req_new & ~req_type & ~resp_hit_temp
+any_miss = req_new & ~resp_hit_temp
 # if miss, set whole block to 0, valid to 1, tag = addr tag. 
 valid_0[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (any_miss & (repl_way_temp == 0)))
 valid_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(pyrtl.Const(1, bitwidth = 1), (any_miss & (repl_way_temp == 1)))
@@ -148,21 +146,21 @@ write_hit = req_new & req_type & resp_hit_temp
 
 # if read miss, set block to 0. if write miss, set block except the new word to 0. if write HIT, then only change the filling. 
 # if miss and repl way, set temp to be 0. else set temp to be new data
-data_0_temp <<= pyrtl.select(read_miss & (repl_way_temp == 0), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
+data_0_temp <<= pyrtl.select(read_miss & hit_0, pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
                              pyrtl.select(write_miss & (repl_way_temp == 0),  write_data, # if write miss, make all 0 but write data
                                           pyrtl.select(write_hit & repl_way_temp == 0, (data_0_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_1_temp <<= pyrtl.select(read_miss & (repl_way_temp == 1), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
+data_1_temp <<= pyrtl.select(read_miss & hit_1, pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
                              pyrtl.select(write_miss & (repl_way_temp == 1),  write_data, # if write miss, make all 0 but write data
                                           pyrtl.select(write_hit & repl_way_temp == 1, (data_1_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_2_temp <<= pyrtl.select(read_miss & (repl_way_temp == 2), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
+data_2_temp <<= pyrtl.select(read_miss & hit_2, pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
                              pyrtl.select(write_miss & (repl_way_temp == 2),  write_data, # if write miss, make all 0 but write data
                                           pyrtl.select(write_hit & repl_way_temp == 2, (data_2_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
-data_3_temp <<= pyrtl.select(read_miss & (repl_way_temp == 3), pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
+data_3_temp <<= pyrtl.select(read_miss & hit_3, pyrtl.Const(0, bitwidth = 128), # if read miss, make all 0
                              pyrtl.select(write_miss & (repl_way_temp == 3),  write_data, # if write miss, make all 0 but write data
                                           pyrtl.select(write_hit & repl_way_temp == 3, (data_3_payload & write_mask) | write_data, pyrtl.Const(0)))) # if write hit, set cavity filling
                                         
 
-data_shift_amount = word_offset * 32
+data_shift_amount = addr_offset * 32
 write_hit = req_new & req_type & resp_hit_temp
 write_miss =  req_new & req_type & ~resp_hit_temp
 
