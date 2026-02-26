@@ -106,6 +106,7 @@ read_word_1 = pyrtl.shift_right_logical(data_1_payload, addr_offset * 32) & pyrt
 read_word_2 = pyrtl.shift_right_logical(data_2_payload, addr_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
 read_word_3 = pyrtl.shift_right_logical(data_3_payload, addr_offset * 32) & pyrtl.Const(0x0FFFFFFFF, bitwidth = 32)
 
+# output of resp_data
 with pyrtl.conditional_assignment:
     with req_new & ~req_type & resp_hit_temp:
         resp_data_temp |= pyrtl.select(hit_0, read_word_0, pyrtl.select(hit_1, read_word_1, pyrtl.select(hit_2, read_word_2, pyrtl.select(hit_3,read_word_3, pyrtl.Const(0, bitwidth = 32)))))
@@ -126,7 +127,8 @@ tag_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (any_miss & (repl_wa
 tag_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (any_miss & (repl_way_temp == 2)))
 tag_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite(addr_tag, (any_miss & (repl_way_temp == 3)))
 
-
+####################################################################################
+# For miss read, and any write, we need to touch our cache:
 
 data_shift_amount = addr_offset * 32
 
@@ -150,10 +152,6 @@ data_1[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_1_payload & write_mask)
 data_2[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_2_payload & write_mask) | write_data, enable_2)
 data_3[addr_index] <<= pyrtl.MemBlock.EnabledWrite((data_3_payload & write_mask) | write_data, enable_3)
 
-
-
-
-# TODO: Determine output
 
 ############################## SIMULATION ######################################
 
